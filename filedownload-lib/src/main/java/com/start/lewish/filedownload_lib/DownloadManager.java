@@ -1,6 +1,8 @@
 package com.start.lewish.filedownload_lib;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Message;
 
 import com.start.lewish.filedownload_lib.callback.FileDownLoadCallback;
 import com.start.lewish.filedownload_lib.file.FileStorageManager;
@@ -32,6 +34,35 @@ import okhttp3.Response;
  */
 public class DownloadManager {
     private static final String TAG = "DownloadManager";
+    public static final int DOWNLOAD_START = 1;
+    public static final int DOWNLOAD_PROGRESS = 2;
+    public static final int DOWNLOAD_SUCCESS = 3;
+    public static final int DOWNLOAD_FAILURE = 4;
+    private FileDownLoadCallback mFileDownLoadCallback;
+    private Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            switch (msg.what) {
+                case DOWNLOAD_START:
+
+                    break;
+                case DOWNLOAD_PROGRESS:
+                    int fileDownLoadProgress = msg.arg1;
+                    mFileDownLoadCallback.onProgress(fileDownLoadProgress);
+                    break;
+                case DOWNLOAD_SUCCESS:
+                    File file = (File) msg.obj;
+                    mFileDownLoadCallback.onSuccess(file);
+                    break;
+                case DOWNLOAD_FAILURE:
+                    int errorCode = msg.arg1;
+                    String errorMsg = (String) msg.obj;
+                    mFileDownLoadCallback.onFailure(errorCode, errorMsg);
+                    break;
+            }
+        }
+    };
     public final static int MAX_THREAD = 2;
     public final static int LOCAL_PROGRESS_SIZE = 1;
     private HashSet<FileDownloadTask> mTaskSet = new HashSet<>();
@@ -54,7 +85,8 @@ public class DownloadManager {
         }
     });
 
-    private DownloadManager() {}
+    private DownloadManager() {
+    }
 
     public static class Holder {
 
@@ -87,9 +119,10 @@ public class DownloadManager {
     }
 
     public void download(final String url, final FileDownLoadCallback fileDownLoadCallback) {
+        mFileDownLoadCallback = fileDownLoadCallback;
         final FileDownloadTask task = new FileDownloadTask(url, fileDownLoadCallback);
         if (mTaskSet.contains(task)) {
-            fileDownLoadCallback.onFailure(HttpManager.TASK_RUNNING_ERROR_CODE, "任务已经执行了");
+            sendDownLoadFailureMsg(HttpManager.TASK_RUNNING_ERROR_CODE, "任务已经执行了");
             return;
         }
         mTaskSet.add(task);
@@ -107,16 +140,16 @@ public class DownloadManager {
                 public void onResponse(Call call, Response response) throws IOException {
 
                     if (!response.isSuccessful() && fileDownLoadCallback != null) {
-                        fileDownLoadCallback.onFailure(HttpManager.NETWORK_ERROR_CODE, "网络出问题了");
+                        sendDownLoadFailureMsg(HttpManager.NETWORK_ERROR_CODE, "网络出问题了");
                         return;
                     }
 
                     mFileLength = response.body().contentLength();
                     if (mFileLength == -1) {
-                        fileDownLoadCallback.onFailure(HttpManager.CONTENT_LENGTH_ERROR_CODE, "content length -1");
+                        sendDownLoadFailureMsg(HttpManager.CONTENT_LENGTH_ERROR_CODE, "content length -1");
                         return;
                     }
-                    processDownload(url, mFileLength, fileDownLoadCallback, mCache);
+                    processDownload(url, mFileLength, handler, mCache);
                     finish(task);
                 }
             });
@@ -130,7 +163,7 @@ public class DownloadManager {
                 }
                 long startSize = entity.getStartPos() + entity.getProgressPos();
                 long endSize = entity.getEndPos();
-                sThreadPool.execute(new DownloadRunnable(startSize, endSize, url, fileDownLoadCallback, entity));
+                sThreadPool.execute(new DownloadRunnable(startSize, endSize, url, handler, entity));
             }
         }
 
@@ -140,12 +173,12 @@ public class DownloadManager {
                 while (true) {
                     try {
                         int fileDownLoadProgress = getFileDownLoadProgress(url);
-                        if(fileDownLoadProgress>=100) {
-                            fileDownLoadCallback.onProgress(fileDownLoadProgress);
+                        Logger.error(TAG, "progress=" + fileDownLoadProgress);
+                        if (fileDownLoadProgress >= 100) {
+                            sendDownLoadProgressMsg(fileDownLoadProgress);
                             return;
                         }
-                        Logger.error(TAG,"progress="+fileDownLoadProgress);
-                        fileDownLoadCallback.onProgress(fileDownLoadProgress);
+                        sendDownLoadProgressMsg(fileDownLoadProgress);
                         Thread.sleep(50);
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -156,19 +189,35 @@ public class DownloadManager {
 
     }
 
-    public boolean isFileDownLoadFinish(String url){
+    private void sendDownLoadProgressMsg(int fileDownLoadProgress) {
+        Message msg = new Message();
+        msg.what = DOWNLOAD_PROGRESS;
+        msg.arg1 = fileDownLoadProgress;
+        handler.sendMessage(msg);
+    }
+
+    private void sendDownLoadFailureMsg(int errorCode, String errorMsg) {
+        Message msg = new Message();
+        msg.what = DOWNLOAD_FAILURE;
+        msg.arg1 = errorCode;
+        msg.obj = errorMsg;
+        handler.sendMessage(msg);
+    }
+
+    public boolean isFileDownLoadFinish(String url) {
         File file = FileStorageManager.Holder.getInstance().getFileByName(url);
         long fileSize = file.length();
         return fileSize >= mFileLength;
     }
 
-    private int getFileDownLoadProgress(String url){
+    private int getFileDownLoadProgress(String url) {
         File file = FileStorageManager.Holder.getInstance().getFileByName(url);
         long fileSize = file.length();
-        return  (int) (fileSize * 100.0 / mFileLength);
+        Logger.error(TAG, "fileSize=" + fileSize + "||mFileLength = " + mFileLength);
+        return (int) (fileSize * 100.0 / mFileLength);
     }
 
-    private void processDownload(String url, long length, FileDownLoadCallback callback, List<DownloadEntity> cache) {
+    private void processDownload(String url, long length, Handler handler, List<DownloadEntity> cache) {
         // 100   2  50  0-49  50-99
         long threadDownloadSize = length / MAX_THREAD;
         if (cache == null || cache.size() == 0) {
@@ -181,7 +230,7 @@ public class DownloadManager {
             entity.setDownloadUrl(url);
             entity.setStartPos(startSize);
             entity.setEndPos(endSize);
-            sThreadPool.execute(new DownloadRunnable(startSize, endSize, url, callback, entity));
+            sThreadPool.execute(new DownloadRunnable(startSize, endSize, url, handler, entity));
         }
 
     }

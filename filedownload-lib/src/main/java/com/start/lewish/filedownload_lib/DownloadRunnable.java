@@ -1,8 +1,9 @@
 package com.start.lewish.filedownload_lib;
 
+import android.os.Handler;
+import android.os.Message;
 import android.os.Process;
 
-import com.start.lewish.filedownload_lib.callback.FileDownLoadCallback;
 import com.start.lewish.filedownload_lib.file.FileStorageManager;
 import com.start.lewish.filedownload_lib.http.HttpManager;
 import com.start.lewish.filedownload_lib.sqlite.DownloadEntity;
@@ -30,33 +31,44 @@ public class DownloadRunnable implements Runnable {
 
     private String mUrl;
 
-    private FileDownLoadCallback mFileDownLoadCallback;
+    private Handler mHandler;
 
     private DownloadEntity mEntity;
 
-    public DownloadRunnable(long mStart, long mEnd, String mUrl, FileDownLoadCallback mFileDownLoadCallback, DownloadEntity mEntity) {
+    public DownloadRunnable(long mStart, long mEnd, String mUrl, Handler hanler, DownloadEntity mEntity) {
         this.mStart = mStart;
         this.mEnd = mEnd;
         this.mUrl = mUrl;
-        this.mFileDownLoadCallback = mFileDownLoadCallback;
+        this.mHandler = hanler;
         this.mEntity = mEntity;
     }
 
-    public DownloadRunnable(long mStart, long mEnd, String mUrl, FileDownLoadCallback mFileDownLoadCallback) {
+    public DownloadRunnable(long mStart, long mEnd, String mUrl, Handler hanler) {
         this.mStart = mStart;
         this.mEnd = mEnd;
         this.mUrl = mUrl;
-        this.mFileDownLoadCallback = mFileDownLoadCallback;
+        this.mHandler = hanler;
+    }
+    private void sendDownLoadSuccess(File file) {
+        Message msg = new Message();
+        msg.what = DownloadManager.DOWNLOAD_SUCCESS;
+        msg.obj = file;
+        mHandler.sendMessage(msg);
     }
 
+    private void sendDownLoadFailureMsg(int errorCode, String errorMsg) {
+        Message msg = new Message();
+        msg.what = DownloadManager.DOWNLOAD_FAILURE;
+        msg.arg1 = errorCode;
+        msg.obj = errorMsg;
+        mHandler.sendMessage(msg);
+    }
     @Override
     public void run() {
         android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
         Response response = HttpManager.Holder.getInstance().syncRequestByRange(mUrl, mStart, mEnd);
         if (response == null) {
-            if(mFileDownLoadCallback !=null) {
-                 mFileDownLoadCallback.onFailure(HttpManager.NETWORK_ERROR_CODE, "网络出问题了");
-            }
+            sendDownLoadFailureMsg(HttpManager.NETWORK_ERROR_CODE, "网络出问题了");
             return;
         }
         File file = FileStorageManager.Holder.getInstance().getFileByName(mUrl);
@@ -76,7 +88,7 @@ public class DownloadRunnable implements Runnable {
             randomAccessFile.close();
             if(DownloadManager.Holder.getInstance().isFileDownLoadFinish(mEntity.getDownloadUrl())) {
                 //文件下载完成
-                mFileDownLoadCallback.onSuccess(file);
+                sendDownLoadSuccess(file);
             }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
