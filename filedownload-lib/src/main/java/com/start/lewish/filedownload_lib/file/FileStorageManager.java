@@ -16,8 +16,8 @@ public class FileStorageManager {
     public static FileStorageManager getInstance(){
         return Holder.sFileStorageManager;
     }
-    public static class Holder{
-        private static FileStorageManager sFileStorageManager = new FileStorageManager();
+    private static class Holder{
+        private static final FileStorageManager sFileStorageManager = new FileStorageManager();
     }
 
     private Context mContext;
@@ -27,7 +27,7 @@ public class FileStorageManager {
     }
 
     public void init(Context context) {
-        this.mContext = context;
+        this.mContext = context.getApplicationContext();
     }
 
     public File getFileByName(String url) {

@@ -39,15 +39,18 @@ public class DownloadManager {
     static final int DOWNLOAD_PROGRESS = 2;
     static final int DOWNLOAD_SUCCESS = 3;
     static final int DOWNLOAD_FAILURE = 4;
+
     private DownloadManager() {
     }
 
     private static class Holder {
         private static final DownloadManager sManager = new DownloadManager();
     }
-    public static DownloadManager getInstance(){
+
+    public static DownloadManager getInstance() {
         return Holder.sManager;
     }
+
     private IFileDownLoadCallback mIFileDownLoadCallback;
 
     private Handler handler = new Handler() {
@@ -65,11 +68,13 @@ public class DownloadManager {
                 case DOWNLOAD_SUCCESS:
                     File file = (File) msg.obj;
                     mIFileDownLoadCallback.onSuccess(file);
+                    mIFileDownLoadCallback = null;
                     break;
                 case DOWNLOAD_FAILURE:
                     int errorCode = msg.arg1;
                     String errorMsg = (String) msg.obj;
                     mIFileDownLoadCallback.onFailure(errorCode, errorMsg);
+                    mIFileDownLoadCallback = null;
                     break;
             }
         }
@@ -118,9 +123,9 @@ public class DownloadManager {
         mTaskSet.remove(task);
     }
 
-    public void download(final String url, final IFileDownLoadCallback IFileDownLoadCallback) {
-        mIFileDownLoadCallback = IFileDownLoadCallback;
-        final FileDownloadTask task = new FileDownloadTask(url, IFileDownLoadCallback);
+    public void download(final String url, final IFileDownLoadCallback iFileDownLoadCallback) {
+        mIFileDownLoadCallback = iFileDownLoadCallback;
+        final FileDownloadTask task = new FileDownloadTask(url, iFileDownLoadCallback);
         if (mTaskSet.contains(task)) {
             sendDownLoadFailureMsg(HttpManager.TASK_RUNNING_ERROR_CODE, "任务已经执行了");
             return;
@@ -139,18 +144,19 @@ public class DownloadManager {
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
 
-                    if (!response.isSuccessful() && IFileDownLoadCallback != null) {
+                    if (!response.isSuccessful() && iFileDownLoadCallback != null) {
                         sendDownLoadFailureMsg(HttpManager.NETWORK_ERROR_CODE, "网络出问题了");
+                        finish(task);
                         return;
                     }
 
                     mFileLength = response.body().contentLength();
                     if (mFileLength == -1) {
                         sendDownLoadFailureMsg(HttpManager.CONTENT_LENGTH_ERROR_CODE, "content length -1");
+                        finish(task);
                         return;
                     }
                     processDownload(url, mFileLength, handler, mCache);
-                    finish(task);
                 }
             });
 
