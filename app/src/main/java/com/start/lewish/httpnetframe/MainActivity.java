@@ -9,7 +9,7 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.start.lewish.filedownload_lib.DownloadManager;
-import com.start.lewish.filedownload_lib.callback.FileDownLoadCallback;
+import com.start.lewish.filedownload_lib.callback.IFileDownLoadCallback;
 import com.start.lewish.filedownload_lib.file.FileStorageManager;
 import com.start.lewish.filedownload_lib.utils.Logger;
 
@@ -26,10 +26,10 @@ public class MainActivity extends AppCompatActivity {
         mProgress = (ProgressBar) findViewById(R.id.progress);
 
         final String url = "http://shouji.360tpcdn.com/160901/84c090897cbf0158b498da0f42f73308/com.icoolme.android.weather_2016090200.apk";
-        File file = FileStorageManager.Holder.getInstance().getFileByName(url);
+        File file = FileStorageManager.getInstance().getFileByName(url);
         Logger.debug("nate", "file path = " + file.getAbsoluteFile());
 //        final String url = "http://szimg.mukewang.com/5763765d0001352105400300-360-202.jpg";
-        DownloadManager.Holder.getInstance().download(url, new FileDownLoadCallback() {
+        DownloadManager.getInstance().download(url, new IFileDownLoadCallback() {
             @Override
             public void onStart() {
 

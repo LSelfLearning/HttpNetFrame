@@ -22,8 +22,7 @@ public class MyApplication extends Application {
                 .maxThreadSize(4)
                 .localProgressThreadSize(1)
                 .build();
-        DownloadManager.Holder.getInstance().init(config,getApplicationContext());
-
+        DownloadManager.getInstance().init(config,getApplicationContext());
         LeakCanary.install(this);
     }
 }

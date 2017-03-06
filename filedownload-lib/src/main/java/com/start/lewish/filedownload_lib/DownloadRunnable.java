@@ -35,29 +35,26 @@ public class DownloadRunnable implements Runnable {
 
     private DownloadEntity mEntity;
 
-    public DownloadRunnable(long mStart, long mEnd, String mUrl, Handler hanler, DownloadEntity mEntity) {
-        this.mStart = mStart;
-        this.mEnd = mEnd;
-        this.mUrl = mUrl;
-        this.mHandler = hanler;
+    public DownloadRunnable(long mStart, long mEnd, String mUrl, Handler handler, DownloadEntity mEntity) {
+        this(mStart,mEnd,mUrl,handler);
         this.mEntity = mEntity;
     }
 
-    public DownloadRunnable(long mStart, long mEnd, String mUrl, Handler hanler) {
+    public DownloadRunnable(long mStart, long mEnd, String mUrl, Handler handler) {
         this.mStart = mStart;
         this.mEnd = mEnd;
         this.mUrl = mUrl;
-        this.mHandler = hanler;
+        this.mHandler = handler;
     }
     private void sendDownLoadSuccess(File file) {
-        Message msg = new Message();
+        Message msg = Message.obtain();
         msg.what = DownloadManager.DOWNLOAD_SUCCESS;
         msg.obj = file;
         mHandler.sendMessage(msg);
     }
 
     private void sendDownLoadFailureMsg(int errorCode, String errorMsg) {
-        Message msg = new Message();
+        Message msg = Message.obtain();
         msg.what = DownloadManager.DOWNLOAD_FAILURE;
         msg.arg1 = errorCode;
         msg.obj = errorMsg;
@@ -66,12 +63,12 @@ public class DownloadRunnable implements Runnable {
     @Override
     public void run() {
         android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
-        Response response = HttpManager.Holder.getInstance().syncRequestByRange(mUrl, mStart, mEnd);
+        Response response = HttpManager.getInstance().syncRequestByRange(mUrl, mStart, mEnd);
         if (response == null) {
             sendDownLoadFailureMsg(HttpManager.NETWORK_ERROR_CODE, "网络出问题了");
             return;
         }
-        File file = FileStorageManager.Holder.getInstance().getFileByName(mUrl);
+        File file = FileStorageManager.getInstance().getFileByName(mUrl);
         long progress = mEntity.getProgressPos() == 0 ? 0 : mEntity.getProgressPos();
         try {
             RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rwd");
@@ -86,7 +83,7 @@ public class DownloadRunnable implements Runnable {
 //                Logger.debug(TAG, "progress  ----->" + progress);
             }
             randomAccessFile.close();
-            if(DownloadManager.Holder.getInstance().isFileDownLoadFinish(mEntity.getDownloadUrl())) {
+            if(DownloadManager.getInstance().isFileDownLoadFinish(mEntity.getDownloadUrl())) {
                 //文件下载完成
                 sendDownLoadSuccess(file);
             }
@@ -95,7 +92,7 @@ public class DownloadRunnable implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            DownloadEntityDao.Holder.getInstance().insertOrReplace(mEntity);
+            DownloadEntityDao.getInstance().insertOrReplace(mEntity);
         }
 
     }

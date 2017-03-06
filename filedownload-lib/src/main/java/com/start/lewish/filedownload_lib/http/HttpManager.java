@@ -1,7 +1,7 @@
 package com.start.lewish.filedownload_lib.http;
 
 
-import com.start.lewish.filedownload_lib.callback.FileDownLoadCallback;
+import com.start.lewish.filedownload_lib.callback.IFileDownLoadCallback;
 import com.start.lewish.filedownload_lib.file.FileStorageManager;
 
 import java.io.File;
@@ -21,12 +21,11 @@ import okhttp3.Response;
  * 下载任务对象
  */
 public class HttpManager {
-
+    public static HttpManager getInstance(){
+        return Holder.sManager;
+    }
     public static class Holder{
         private static HttpManager sManager = new HttpManager();
-        public static HttpManager getInstance(){
-            return sManager;
-        }
     }
 
     public static final int NETWORK_ERROR_CODE = 1;
@@ -89,9 +88,9 @@ public class HttpManager {
     /**
      * 异步请求下载文件
      * @param url
-     * @param fileDownLoadCallback
+     * @param IFileDownLoadCallback
      */
-    public void asyncRequest(final String url, final FileDownLoadCallback fileDownLoadCallback) {
+    public void asyncRequest(final String url, final IFileDownLoadCallback IFileDownLoadCallback) {
         Request request = new Request.Builder().url(url).build();
         mClient.newCall(request).enqueue(new Callback() {
             @Override
@@ -100,10 +99,10 @@ public class HttpManager {
             }
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (!response.isSuccessful() && fileDownLoadCallback != null) {
-                    fileDownLoadCallback.onFailure(NETWORK_ERROR_CODE, "请求失败");
+                if (!response.isSuccessful() && IFileDownLoadCallback != null) {
+                    IFileDownLoadCallback.onFailure(NETWORK_ERROR_CODE, "请求失败");
                 }
-                File file = FileStorageManager.Holder.getInstance().getFileByName(url);
+                File file = FileStorageManager.getInstance().getFileByName(url);
                 byte[] buffer = new byte[1024 * 500];
                 int len;
                 FileOutputStream fileOut = new FileOutputStream(file);
@@ -112,8 +111,8 @@ public class HttpManager {
                     fileOut.write(buffer, 0, len);
                     fileOut.flush();
                 }
-                if(fileDownLoadCallback!=null) {
-                    fileDownLoadCallback.onSuccess(file);
+                if(IFileDownLoadCallback !=null) {
+                    IFileDownLoadCallback.onSuccess(file);
                 }
             }
         });

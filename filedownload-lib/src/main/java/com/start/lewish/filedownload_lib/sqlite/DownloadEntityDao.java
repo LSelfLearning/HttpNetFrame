@@ -18,13 +18,11 @@ public class DownloadEntityDao {
     private DownloadDBHelper mDownloadDBHelper;
     private DownloadEntityDao() {
     }
+    public static DownloadEntityDao getInstance(){
+        return Holder.instance;
+    }
     public static class Holder {
-
-        private static DownloadEntityDao instance = new DownloadEntityDao();
-
-        public static DownloadEntityDao getInstance() {
-            return instance;
-        }
+        private static final DownloadEntityDao instance = new DownloadEntityDao();
     }
 
     public void init(Context context) {

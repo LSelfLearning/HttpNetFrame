@@ -13,11 +13,11 @@ import java.io.IOException;
  * created at 2017/1/11 14:44
  */
 public class FileStorageManager {
+    public static FileStorageManager getInstance(){
+        return Holder.sFileStorageManager;
+    }
     public static class Holder{
         private static FileStorageManager sFileStorageManager = new FileStorageManager();
-        public static FileStorageManager getInstance(){
-            return sFileStorageManager;
-        }
     }
 
     private Context mContext;

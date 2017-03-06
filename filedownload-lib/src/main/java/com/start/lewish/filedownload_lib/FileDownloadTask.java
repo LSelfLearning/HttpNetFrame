@@ -1,7 +1,7 @@
 package com.start.lewish.filedownload_lib;
 
 
-import com.start.lewish.filedownload_lib.callback.FileDownLoadCallback;
+import com.start.lewish.filedownload_lib.callback.IFileDownLoadCallback;
 
 /**
  * author: sundong
@@ -11,9 +11,9 @@ import com.start.lewish.filedownload_lib.callback.FileDownLoadCallback;
 public class FileDownloadTask {
     private String mUrl;
 
-    private FileDownLoadCallback mCallback;
+    private IFileDownLoadCallback mCallback;
 
-    public FileDownloadTask(String mUrl, FileDownLoadCallback mCallback) {
+    public FileDownloadTask(String mUrl, IFileDownLoadCallback mCallback) {
         this.mUrl = mUrl;
         this.mCallback = mCallback;
     }
@@ -26,11 +26,11 @@ public class FileDownloadTask {
         return mUrl;
     }
 
-    public void setCallback(FileDownLoadCallback mCallback) {
+    public void setCallback(IFileDownLoadCallback mCallback) {
         this.mCallback = mCallback;
     }
 
-    public FileDownLoadCallback getCallback() {
+    public IFileDownLoadCallback getCallback() {
         return mCallback;
     }
 

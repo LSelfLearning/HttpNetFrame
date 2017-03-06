@@ -3,8 +3,9 @@ package com.start.lewish.filedownload_lib;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
+import android.support.annotation.NonNull;
 
-import com.start.lewish.filedownload_lib.callback.FileDownLoadCallback;
+import com.start.lewish.filedownload_lib.callback.IFileDownLoadCallback;
 import com.start.lewish.filedownload_lib.file.FileStorageManager;
 import com.start.lewish.filedownload_lib.http.HttpManager;
 import com.start.lewish.filedownload_lib.sqlite.DownloadEntity;
@@ -34,35 +35,46 @@ import okhttp3.Response;
  */
 public class DownloadManager {
     private static final String TAG = "DownloadManager";
-    public static final int DOWNLOAD_START = 1;
-    public static final int DOWNLOAD_PROGRESS = 2;
-    public static final int DOWNLOAD_SUCCESS = 3;
-    public static final int DOWNLOAD_FAILURE = 4;
-    private FileDownLoadCallback mFileDownLoadCallback;
+    static final int DOWNLOAD_START = 1;
+    static final int DOWNLOAD_PROGRESS = 2;
+    static final int DOWNLOAD_SUCCESS = 3;
+    static final int DOWNLOAD_FAILURE = 4;
+    private DownloadManager() {
+    }
+
+    private static class Holder {
+        private static final DownloadManager sManager = new DownloadManager();
+    }
+    public static DownloadManager getInstance(){
+        return Holder.sManager;
+    }
+    private IFileDownLoadCallback mIFileDownLoadCallback;
+
     private Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             switch (msg.what) {
                 case DOWNLOAD_START:
-
+                    mIFileDownLoadCallback.onStart();
                     break;
                 case DOWNLOAD_PROGRESS:
                     int fileDownLoadProgress = msg.arg1;
-                    mFileDownLoadCallback.onProgress(fileDownLoadProgress);
+                    mIFileDownLoadCallback.onProgress(fileDownLoadProgress);
                     break;
                 case DOWNLOAD_SUCCESS:
                     File file = (File) msg.obj;
-                    mFileDownLoadCallback.onSuccess(file);
+                    mIFileDownLoadCallback.onSuccess(file);
                     break;
                 case DOWNLOAD_FAILURE:
                     int errorCode = msg.arg1;
                     String errorMsg = (String) msg.obj;
-                    mFileDownLoadCallback.onFailure(errorCode, errorMsg);
+                    mIFileDownLoadCallback.onFailure(errorCode, errorMsg);
                     break;
             }
         }
     };
+
     public final static int MAX_THREAD = 2;
     public final static int LOCAL_PROGRESS_SIZE = 1;
     private HashSet<FileDownloadTask> mTaskSet = new HashSet<>();
@@ -85,30 +97,18 @@ public class DownloadManager {
         }
     });
 
-    private DownloadManager() {
-    }
-
-    public static class Holder {
-
-        private static DownloadManager sManager = new DownloadManager();
-
-        public static DownloadManager getInstance() {
-            return sManager;
-        }
-    }
-
     public void init(DownloadConfig config, Context context) {
-        this.mContext = context;
-        FileStorageManager.Holder.getInstance().init(context);
-        DownloadEntityDao.Holder.getInstance().init(context);
+        Context applicationContext = context.getApplicationContext();
+        this.mContext = applicationContext;
+        FileStorageManager.getInstance().init(applicationContext);
+        DownloadEntityDao.getInstance().init(applicationContext);
 
         sThreadPool = new ThreadPoolExecutor(config.getCoreThreadSize(), config.getMaxThreadSize(), 60, TimeUnit.MILLISECONDS, new LinkedBlockingDeque<Runnable>(), new ThreadFactory() {
             private AtomicInteger mInteger = new AtomicInteger(1);
 
             @Override
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(runnable, "download thread #" + mInteger.getAndIncrement());
-                return thread;
+            public Thread newThread(@NonNull Runnable runnable) {
+                return new Thread(runnable, "download thread #" + mInteger.getAndIncrement());
             }
         });
         sLocalProgressPool = Executors.newFixedThreadPool(config.getLocalProgressThreadSize());
@@ -118,18 +118,18 @@ public class DownloadManager {
         mTaskSet.remove(task);
     }
 
-    public void download(final String url, final FileDownLoadCallback fileDownLoadCallback) {
-        mFileDownLoadCallback = fileDownLoadCallback;
-        final FileDownloadTask task = new FileDownloadTask(url, fileDownLoadCallback);
+    public void download(final String url, final IFileDownLoadCallback IFileDownLoadCallback) {
+        mIFileDownLoadCallback = IFileDownLoadCallback;
+        final FileDownloadTask task = new FileDownloadTask(url, IFileDownLoadCallback);
         if (mTaskSet.contains(task)) {
             sendDownLoadFailureMsg(HttpManager.TASK_RUNNING_ERROR_CODE, "任务已经执行了");
             return;
         }
         mTaskSet.add(task);
 
-        mCache = DownloadEntityDao.Holder.getInstance().getDownloadEntityByUrl(url);
+        mCache = DownloadEntityDao.getInstance().getDownloadEntityByUrl(url);
         if (mCache == null || mCache.size() == 0) {
-            HttpManager.Holder.getInstance().asyncRequest(url, new Callback() {
+            HttpManager.getInstance().asyncRequest(url, new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
                     finish(task);
@@ -139,7 +139,7 @@ public class DownloadManager {
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
 
-                    if (!response.isSuccessful() && fileDownLoadCallback != null) {
+                    if (!response.isSuccessful() && IFileDownLoadCallback != null) {
                         sendDownLoadFailureMsg(HttpManager.NETWORK_ERROR_CODE, "网络出问题了");
                         return;
                     }
@@ -173,12 +173,11 @@ public class DownloadManager {
                 while (true) {
                     try {
                         int fileDownLoadProgress = getFileDownLoadProgress(url);
+                        sendDownLoadProgressMsg(fileDownLoadProgress);
                         Logger.error(TAG, "progress=" + fileDownLoadProgress);
                         if (fileDownLoadProgress >= 100) {
-                            sendDownLoadProgressMsg(fileDownLoadProgress);
                             return;
                         }
-                        sendDownLoadProgressMsg(fileDownLoadProgress);
                         Thread.sleep(50);
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -205,13 +204,13 @@ public class DownloadManager {
     }
 
     public boolean isFileDownLoadFinish(String url) {
-        File file = FileStorageManager.Holder.getInstance().getFileByName(url);
+        File file = FileStorageManager.getInstance().getFileByName(url);
         long fileSize = file.length();
         return fileSize >= mFileLength;
     }
 
     private int getFileDownLoadProgress(String url) {
-        File file = FileStorageManager.Holder.getInstance().getFileByName(url);
+        File file = FileStorageManager.getInstance().getFileByName(url);
         long fileSize = file.length();
         Logger.error(TAG, "fileSize=" + fileSize + "||mFileLength = " + mFileLength);
         return (int) (fileSize * 100.0 / mFileLength);
